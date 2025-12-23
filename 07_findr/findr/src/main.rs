@@ -69,26 +69,14 @@ fn print(args: &Args, entry: DirEntry) -> Result<()>  {
     if !args.entry_types.is_empty() {
         let file_type = entry.file_type();
 
-        let mut matches = false;
-        for entry_type in &args.entry_types {
+        let matches = args.entry_types.iter().map(|entry_type| {
             match entry_type {
-                EntryType::Dir => {
-                    if file_type.is_dir() {
-                        matches = true;
-                    }
-                }
-                EntryType::File => {
-                    if file_type.is_file() {
-                        matches = true;
-                    }
-                }
-                EntryType::Link => {
-                    if file_type.is_symlink() {
-                        matches = true;
-                    }
-                }
+                EntryType::Dir => file_type.is_dir(),
+                EntryType::File => file_type.is_file(),
+                EntryType::Link => file_type.is_symlink(),
             }
-        }
+        }).any(|v| v);
+        
         if !matches {
             return Ok(())
         }
