@@ -76,7 +76,7 @@ fn print(args: &Args, entry: DirEntry) -> Result<()>  {
                 EntryType::Link => file_type.is_symlink(),
             }
         }).any(|v| v);
-        
+
         if !matches {
             return Ok(())
         }
