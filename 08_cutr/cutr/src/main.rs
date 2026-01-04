@@ -1,7 +1,7 @@
 use anyhow::{Result, bail};
 use clap::Parser;
 use std::fs::{File};
-use std::io::{self, BufRead, BufReader};
+use std::io::{self, BufRead, BufReader, stdout};
 use std::ops::Range;
 use csv::{ReaderBuilder, StringRecord, WriterBuilder};
 
@@ -175,18 +175,13 @@ fn run(args: Args) -> Result<()> {
                         .has_headers(false)
                         .from_reader(file);
 
+                    let mut writer = WriterBuilder::new()
+                        .delimiter(delimiter)
+                        .from_writer(io::stdout());
+
                     for record in reader.records() {
                         let fields = extract_fields(&record?, field_pos);
-
-                        let mut writer = WriterBuilder::new()
-                            .delimiter(delimiter)
-                            .from_writer(vec![]);
-
-                        writer.write_record(fields);
-
-                        let line = String::from_utf8(writer.into_inner()?)?;
-
-                        print!("{}", line);
+                        writer.write_record(fields)?;
                     }
                 }
                 Extract::Bytes(byte_pos) => {
