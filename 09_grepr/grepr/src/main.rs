@@ -1,8 +1,10 @@
 use std::fs;
 use clap::Parser;
-use regex::RegexBuilder;
+use regex::{RegexBuilder, Regex};
 use anyhow::{anyhow, Result, bail};
 use walkdir::{WalkDir, DirEntry};
+use std::io::{self, BufRead, BufReader, stdout};
+use std::fs::{File};
 
 #[derive(Debug, Parser)]
 #[command(author, version, about)]
@@ -62,13 +64,74 @@ fn find_files(paths: &[String], recursive: bool) -> Vec<Result<String>> {
     results
 }
 
+fn find_lines<T: BufRead>(mut file: T, pattern: &Regex, invert: bool,
+) -> Result<Vec<String>> {
+
+    let mut matches: Vec<String> = Vec::new();
+
+    let mut line = String::new();
+
+    loop {
+        match file.read_line(&mut line) {
+            Ok(size) => {
+
+                if size == 0 {
+                    break
+                }
+
+                if pattern.is_match(&line) ^ invert {
+                    matches.push(line.clone())
+                }
+            },
+            Err(e) => break
+        }
+
+        line.clear();
+    }
+
+    Ok(matches)
+}
+
+fn open(filename: &str) -> Result<Box<dyn BufRead>> {
+    match filename {
+        "-" => Ok(Box::new(BufReader::new(io::stdin()))),
+        _ => Ok(Box::new(BufReader::new(File::open(filename)?))),
+    }
+}
+
 fn run(args: Args) -> anyhow::Result<()> {
     let pattern = RegexBuilder::new(&args.pattern)
         .case_insensitive(args.insensitive)
         .build()
         .map_err(|_| anyhow!(r#"Invalid pattern "{}""#, args.pattern))?;
 
-    println!(r#"pattern "{pattern}""#);
+    let entries = find_files(&args.files, args.recursive);
+    for entry in &entries {
+        match entry {
+            Err(e) => eprintln!("{e}"),
+            Ok(filename) => match open(&filename) {
+                Ok(file) => {
+                    let matches = find_lines(file, &pattern, args.invert)?;
+
+                    let prefix = if args.files.len() > 1 || args.recursive {
+                        filename.to_owned() + ":"
+                    } else {
+                        String::new()
+                    };
+
+                    if args.count {
+                        let count = matches.len();
+                        println!("{prefix}{count}");
+                    } else {
+                        for _match in matches {
+                            print!("{prefix}{_match}")
+                        }
+                    }
+                }
+                Err(e) => eprintln!("{filename}: {e}")
+            }
+        }
+    }
 
     Ok(())
 }
